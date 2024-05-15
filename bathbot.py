@@ -36,7 +36,9 @@ async def on_ready():
     con = sqlite3.connect("bathbase.db")
     cur = con.cursor()
 
-    cur.execute("CREATE TABLE usermoney(user INT, money INT)")
+    cur.execute("""CREATE TABLE usermoney(
+                userID INTEGER PRIMARY KEY,
+                money INTEGER DEFAULT 0)""")
     con.commit()
     con.close()
 
@@ -50,18 +52,20 @@ async def payday(ctx):
 
     # initialize if user is not initialized
     #print(cur.execute("SELECT COUNT(*) FROM usermoney WHERE user = ?", (user,)).fetchall())
-    if cur.execute("SELECT COUNT(*) FROM usermoney WHERE user = ?", (user,)).fetchall() == [(0,)]:
+    if cur.execute("SELECT COUNT(*) FROM usermoney WHERE userID = ?", (user,)).fetchall() == [(0,)]:
         print(" not found, init")
-        cur.execute("INSERT INTO usermoney (user, money) VALUES (?, ?)", [int(user,), int(0,)])
+        cur.execute("INSERT INTO usermoney (userID, money) VALUES (?, ?)", (user, 0))
         con.commit()
 
-    oldmoney = cur.execute("SELECT money FROM usermoney WHERE user = ?", (user,))
-    oldmoney = oldmoney.fetchone()
+    oldmoney = cur.execute("SELECT money FROM usermoney WHERE userID = ?", (user,)).fetchone()[0]
     print(oldmoney)
-    mymoney = cur.execute("INSERT OR REPLACE usermoney SET ?=?, money= ?", [(user,), (user,), (oldmoney+1,)])
-    mymoney = mymoney.fetchone()[user]
+    cur.execute("UPDATE usermoney SET money = ? WHERE userID = ?", (int(oldmoney)+1, user))
     con.commit()
-    await ctx.send(f"Your cash sire: ${mymoney}")
+
+    # Retrieve the updated money value
+    updated_money = cur.execute("SELECT money FROM usermoney WHERE userID = ?", (user,)).fetchone()[0]
+
+    await ctx.send(f"Your cash sire: ${updated_money}")
     con.close()
 
 
