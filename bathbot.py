@@ -1,5 +1,6 @@
 import os
 import discord
+import sqlite3
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -10,13 +11,58 @@ intents = discord.Intents.default()
 intents.members = True
 intents.messages = True
 
-bot = commands.Bot(command_prefix='.', description='BathBot commands', intents=intents)
+bot = commands.Bot(command_prefix='/', description='BathBot commands', intents=intents)
 
+GUILDID = os.getenv('GUILD_ID')
+
+
+
+
+#bot stuff
 
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user} (ID: {bot.user.id})')
     print('------')
+
+    # Database stuff
+    try:
+        os.remove("bathbase.db")
+        print("clearing bathbase")
+    except:
+        print("bathbase not found!")
+
+    print("creating bathbase")
+    con = sqlite3.connect("bathbase.db")
+    cur = con.cursor()
+
+    cur.execute("CREATE TABLE usermoney(user INT, money INT)")
+    con.commit()
+    con.close()
+
+@bot.command()
+async def payday(ctx):
+    con = sqlite3.connect("bathbase.db")
+    cur = con.cursor()
+
+    user = ctx.message.author.id
+    print(f"id: {user}")
+
+    # initialize if user is not initialized
+    #print(cur.execute("SELECT COUNT(*) FROM usermoney WHERE user = ?", (user,)).fetchall())
+    if cur.execute("SELECT COUNT(*) FROM usermoney WHERE user = ?", (user,)).fetchall() == [(0,)]:
+        print(" not found, init")
+        cur.execute("INSERT INTO usermoney (user, money) VALUES (?, ?)", [int(user,), int(0,)])
+        con.commit()
+
+    oldmoney = cur.execute("SELECT money FROM usermoney WHERE user = ?", (user,))
+    oldmoney = oldmoney.fetchone()
+    print(oldmoney)
+    mymoney = cur.execute("INSERT OR REPLACE usermoney SET ?=?, money= ?", [(user,), (user,), (oldmoney+1,)])
+    mymoney = mymoney.fetchone()[user]
+    con.commit()
+    await ctx.send(f"Your cash sire: ${mymoney}")
+    con.close()
 
 
 @bot.command()
