@@ -1,0 +1,11 @@
+.env
+*.env
+.env*
+*.env*
+*/bot-env*
+*/bot-env
+/bot-env*
+bot-env
+bot-env*
+*bot-env
+*bot-env*
