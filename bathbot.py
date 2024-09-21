@@ -39,8 +39,96 @@ async def on_ready():
     cur.execute("""CREATE TABLE usermoney(
                 userID INTEGER PRIMARY KEY,
                 money INTEGER DEFAULT 0)""")
+    cur.execute("""CREATE TABLE inventory(
+                userID INTEGER PRIMARY KEY,
+                items TEXT)""")
     con.commit()
     con.close()
+
+@bot.command()
+async def inventory(ctx):
+    con = sqlite3.connect("bathbase.db")
+    cur = con.cursor()
+
+    user = ctx.message.author.id
+    print(f"id: {user}")
+
+    # initialize if user is not initialized
+    if cur.execute("SELECT COUNT(*) FROM inventory WHERE userID = ?", (user,)).fetchall() == [(0,)]:
+        print(" not found, init")
+        cur.execute("INSERT INTO inventory (userID, items) VALUES (?, ?)", (user, ""))
+        con.commit()
+
+    currentinventory = cur.execute("SELECT items FROM inventory WHERE userID = ?", (user,)).fetchone()[0]
+
+    # format inventory
+    currentinventory = currentinventory.split('/')
+
+    outputstring = ""
+    for item in currentinventory:
+        outputstring += item + "\n"
+
+    await ctx.send(f"----\n${outputstring}\n----")
+    con.commit()
+    con.close()
+
+@bot.command()
+async def itemget(ctx, item):
+    con = sqlite3.connect("bathbase.db")
+    cur = con.cursor()
+
+    user = ctx.message.author.id
+    print(f"id: {user}")
+
+    # initialize if user is not initialized
+    if cur.execute("SELECT COUNT(*) FROM inventory WHERE userID = ?", (user,)).fetchall() == [(0,)]:
+        print(" not found, init")
+        cur.execute("INSERT INTO inventory (userID, items) VALUES (?, ?)", (user, ""))
+        con.commit()
+
+    currentinventory = cur.execute("SELECT items FROM inventory WHERE userID = ?", (user,)).fetchone()[0]
+    currentinventory += "/" + item.replace("/","_")
+    cur.execute("DELETE FROM inventory WHERE userID = ?", (user))
+    cur.execute("INSERT INTO inventory (userID, items) VALUES (?, ?)", (user, currentinventory))
+
+    await ctx.send("Obtained " + item)
+
+    con.commit()
+    con.close()
+
+@bot.command()
+async def itemremove(ctx, item):
+    con = sqlite3.connect("bathbase.db")
+    cur = con.cursor()
+
+    user = ctx.message.author.id
+    print(f"id: {user}")
+
+    # initialize if user is not initialized
+    if cur.execute("SELECT COUNT(*) FROM inventory WHERE userID = ?", (user,)).fetchall() == [(0,)]:
+        print(" not found, init")
+        cur.execute("INSERT INTO inventory (userID, items) VALUES (?, ?)", (user, ""))
+        con.commit()
+
+    currentinventory = cur.execute("SELECT items FROM inventory WHERE userID = ?", (user,)).fetchone()[0]
+    
+    if currentinventory.find(item) == -1:
+        await ctx.send("Item not found! Use /inventory to view your items")
+        con.commit()
+        con.close()
+        return
+
+    currentinventory = currentinventory.replace("/"+item, "")
+
+    cur.execute("DELETE FROM inventory WHERE userID = ?", (user))
+    cur.execute("INSERT INTO inventory (userID, items) VALUES (?, ?)", (user, currentinventory))
+
+    await ctx.send("Removed " + item)
+    
+    con.commit()
+    con.close()
+
+
 
 @bot.command()
 async def payday(ctx):
@@ -66,6 +154,38 @@ async def payday(ctx):
     updated_money = cur.execute("SELECT money FROM usermoney WHERE userID = ?", (user,)).fetchone()[0]
 
     await ctx.send(f"Your cash sire: ${updated_money}")
+    con.close()
+
+@bot.command()
+async def gamble(ctx, *amount: int):
+
+    if len(amount) != 1:
+        await ctx.send(f"wrong args")
+        return
+    amount = int(amount[0])
+    print(f"amount: {amount}")
+
+    con = sqlite3.connect("bathbase.db")
+    cur = con.cursor()
+
+    user = ctx.message.author.id
+    print(f"id: {user}")
+
+    if cur.execute("SELECT COUNT(*) FROM usermoney WHERE userID = ?", (user,)).fetchall() == [(0,)]:
+        print(" not found, init")
+        cur.execute("INSERT INTO usermoney (userID, money) VALUES (?, ?)", (user, 0))
+        con.commit()
+
+    oldmoney = cur.execute("SELECT money FROM usermoney WHERE userID = ?", (user,)).fetchone()[0]
+    print(oldmoney)
+
+    if random.random()*100 < 50:
+        cur.execute("UPDATE usermoney SET money = ? WHERE userID = ?", (int(oldmoney)+amount, user))
+        await ctx.send(f"You win! Balance: {oldmoney+amount}")
+    else:
+        cur.execute("UPDATE usermoney SET money = ? WHERE userID = ?", (int(oldmoney)-amount, user))
+        await ctx.send(f"You LOSE fuckhead! Balance: {oldmoney-amount}")
+    con.commit()
     con.close()
 
 
